@@ -1,0 +1,357 @@
+@{
+    ViewBag.Title = "Görüşme Değerlendirmesi";
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .evaluation-card { background: white; border-radius: 15px; padding: 2rem; max-width: 600px; margin: 2rem auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .star-rating { font-size: 2rem; color: #ddd; cursor: pointer; transition: all 0.3s ease; }
+        .star-rating.active { color: #ffc107; }
+        .star-rating:hover { color: #ffc107; transform: scale(1.1); }
+        .evaluation-section { margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 10px; }
+        .thank-you-message { text-align: center; color: white; margin: 2rem 0; }
+        .feedback-item { margin-bottom: 1rem; }
+        .emoji-selector { font-size: 2rem; cursor: pointer; margin: 0 0.5rem; transition: transform 0.3s ease; }
+        .emoji-selector:hover { transform: scale(1.2); }
+        .emoji-selector.selected { background: #fff3cd; border-radius: 50%; padding: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="thank-you-message">
+            <h1><i class="fas fa-heart"></i> Teşekkür Ederiz!</h1>
+            <p class="lead">Görüşmemiz tamamlandı. Deneyiminizi değerlendirmeniz bizim için çok önemli.</p>
+        </div>
+
+        <div class="evaluation-card">
+            <form id="evaluationForm">
+                <!-- Overall Rating -->
+                <div class="evaluation-section">
+                    <h4><i class="fas fa-star"></i> Genel Memnuniyet</h4>
+                    <p class="text-muted">Görüşmeden ne kadar memnun kaldınız?</p>
+                    <div class="text-center">
+                        <div class="star-rating-container">
+                            <span class="star-rating" data-rating="1">★</span>
+                            <span class="star-rating" data-rating="2">★</span>
+                            <span class="star-rating" data-rating="3">★</span>
+                            <span class="star-rating" data-rating="4">★</span>
+                            <span class="star-rating" data-rating="5">★</span>
+                        </div>
+                        <div class="mt-2">
+                            <small id="ratingText" class="text-muted">Puanlamak için yıldızlara tıklayın</small>
+                        </div>
+                        <input type="hidden" id="overallRating" name="overallRating" required>
+                    </div>
+                </div>
+
+                <!-- Video Quality -->
+                <div class="evaluation-section">
+                    <h5><i class="fas fa-video"></i> Video Kalitesi</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="feedback-item">
+                                <label class="form-label">Video kalitesi nasıldı?</label>
+                                <select class="form-select" name="videoQuality" required>
+                                    <option value="">Seçiniz</option>
+                                    <option value="excellent">Mükemmel</option>
+                                    <option value="good">İyi</option>
+                                    <option value="average">Orta</option>
+                                    <option value="poor">Kötü</option>
+                                    <option value="very_poor">Çok Kötü</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="feedback-item">
+                                <label class="form-label">Ses kalitesi nasıldı?</label>
+                                <select class="form-select" name="audioQuality" required>
+                                    <option value="">Seçiniz</option>
+                                    <option value="excellent">Mükemmel</option>
+                                    <option value="good">İyi</option>
+                                    <option value="average">Orta</option>
+                                    <option value="poor">Kötü</option>
+                                    <option value="very_poor">Çok Kötü</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connection Stability -->
+                <div class="evaluation-section">
+                    <h5><i class="fas fa-wifi"></i> Bağlantı Durumu</h5>
+                    <div class="feedback-item">
+                        <label class="form-label">Bağlantı sorunları yaşadınız mı?</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="connectionIssues" id="noIssues" value="no" required>
+                            <label class="form-check-label" for="noIssues">
+                                Hayır, sorunsuzdu
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="connectionIssues" id="minorIssues" value="minor">
+                            <label class="form-check-label" for="minorIssues">
+                                Küçük sorunlar yaşadım
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="connectionIssues" id="majorIssues" value="major">
+                            <label class="form-check-label" for="majorIssues">
+                                Büyük sorunlar yaşadım
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Experience -->
+                <div class="evaluation-section">
+                    <h5><i class="fas fa-user-cog"></i> Kullanım Deneyimi</h5>
+                    <div class="feedback-item">
+                        <label class="form-label">Hangi özellikler kullanışlıydı? (Birden fazla seçebilirsiniz)</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="usefulFeatures" value="video_call" id="featureVideo">
+                                    <label class="form-check-label" for="featureVideo">Video görüşme</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="usefulFeatures" value="chat" id="featureChat">
+                                    <label class="form-check-label" for="featureChat">Chat özelliği</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="usefulFeatures" value="file_sharing" id="featureFile">
+                                    <label class="form-check-label" for="featureFile">Dosya paylaşımı</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="usefulFeatures" value="screen_share" id="featureScreen">
+                                    <label class="form-check-label" for="featureScreen">Ekran paylaşımı</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="usefulFeatures" value="controls" id="featureControls">
+                                    <label class="form-check-label" for="featureControls">Kontrol butonları</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="usefulFeatures" value="interface" id="featureInterface">
+                                    <label class="form-check-label" for="featureInterface">Genel arayüz</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Emotion Feedback -->
+                <div class="evaluation-section">
+                    <h5><i class="fas fa-smile"></i> Görüşme Sonrası Hisleriniz</h5>
+                    <p class="text-muted">Görüşme sonrasında kendinizi nasıl hissediyorsunuz?</p>
+                    <div class="text-center">
+                        <span class="emoji-selector" data-emotion="very_happy" title="Çok Mutlu">😄</span>
+                        <span class="emoji-selector" data-emotion="happy" title="Mutlu">😊</span>
+                        <span class="emoji-selector" data-emotion="neutral" title="Normal">😐</span>
+                        <span class="emoji-selector" data-emotion="sad" title="Üzgün">😔</span>
+                        <span class="emoji-selector" data-emotion="very_sad" title="Çok Üzgün">😢</span>
+                        <input type="hidden" id="emotionFeedback" name="emotionFeedback">
+                    </div>
+                </div>
+
+                <!-- Comments -->
+                <div class="evaluation-section">
+                    <h5><i class="fas fa-comment-alt"></i> Yorumlarınız</h5>
+                    <div class="feedback-item">
+                        <label class="form-label">Bizimle paylaşmak istediğiniz görüş ve önerileriniz:</label>
+                        <textarea class="form-control" name="comments" rows="4" placeholder="Deneyiminizi bizimle paylaşın..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Recommendation -->
+                <div class="evaluation-section">
+                    <h5><i class="fas fa-thumbs-up"></i> Tavsiye</h5>
+                    <div class="feedback-item">
+                        <label class="form-label">Bu sistemi başkalarına tavsiye eder misiniz?</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="recommendation" id="definitely" value="definitely" required>
+                            <label class="form-check-label" for="definitely">
+                                Kesinlikle tavsiye ederim
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="recommendation" id="probably" value="probably">
+                            <label class="form-check-label" for="probably">
+                                Muhtemelen tavsiye ederim
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="recommendation" id="neutral_rec" value="neutral">
+                            <label class="form-check-label" for="neutral_rec">
+                                Kararsızım
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="recommendation" id="probably_not" value="probably_not">
+                            <label class="form-check-label" for="probably_not">
+                                Muhtemelen tavsiye etmem
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="recommendation" id="definitely_not" value="definitely_not">
+                            <label class="form-check-label" for="definitely_not">
+                                Kesinlikle tavsiye etmem
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-paper-plane"></i> Değerlendirmeyi Gönder
+                    </button>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-lock"></i> Değerlendirmeniz gizli tutulacak ve sadece iyileştirme amacıyla kullanılacaktır.
+                        </small>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Thank You Modal -->
+        <div class="modal fade" id="thankYouModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-body text-center p-4">
+                        <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                        <h4>Teşekkür Ederiz!</h4>
+                        <p>Değerlendirmeniz başarıyla kaydedildi. Görüşleriniz bizim için çok değerli.</p>
+                        <button type="button" class="btn btn-primary" onclick="window.close()">
+                            <i class="fas fa-times"></i> Sayfayı Kapat
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Star Rating System
+        document.querySelectorAll('.star-rating').forEach(star => {
+            star.addEventListener('click', function() {
+                const rating = parseInt(this.getAttribute('data-rating'));
+                document.getElementById('overallRating').value = rating;
+                
+                // Update star display
+                document.querySelectorAll('.star-rating').forEach((s, index) => {
+                    if (index < rating) {
+                        s.classList.add('active');
+                    } else {
+                        s.classList.remove('active');
+                    }
+                });
+                
+                // Update rating text
+                const ratingTexts = ['', 'Çok Kötü', 'Kötü', 'Orta', 'İyi', 'Mükemmel'];
+                document.getElementById('ratingText').textContent = ratingTexts[rating];
+            });
+            
+            star.addEventListener('mouseover', function() {
+                const rating = parseInt(this.getAttribute('data-rating'));
+                document.querySelectorAll('.star-rating').forEach((s, index) => {
+                    if (index < rating) {
+                        s.style.color = '#ffc107';
+                    } else {
+                        s.style.color = '#ddd';
+                    }
+                });
+            });
+        });
+
+        // Reset stars on mouse leave
+        document.querySelector('.star-rating-container').addEventListener('mouseleave', function() {
+            const currentRating = parseInt(document.getElementById('overallRating').value) || 0;
+            document.querySelectorAll('.star-rating').forEach((s, index) => {
+                if (index < currentRating) {
+                    s.style.color = '#ffc107';
+                } else {
+                    s.style.color = '#ddd';
+                }
+            });
+        });
+
+        // Emotion Selector
+        document.querySelectorAll('.emoji-selector').forEach(emoji => {
+            emoji.addEventListener('click', function() {
+                // Remove previous selection
+                document.querySelectorAll('.emoji-selector').forEach(e => e.classList.remove('selected'));
+                
+                // Add selection to clicked emoji
+                this.classList.add('selected');
+                document.getElementById('emotionFeedback').value = this.getAttribute('data-emotion');
+            });
+        });
+
+        // Form Submission
+        document.getElementById('evaluationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Collect form data
+            const formData = new FormData(this);
+            const data = {};
+            
+            // Regular form fields
+            for (let [key, value] of formData.entries()) {
+                if (data[key]) {
+                    // Handle multiple values (checkboxes)
+                    if (Array.isArray(data[key])) {
+                        data[key].push(value);
+                    } else {
+                        data[key] = [data[key], value];
+                    }
+                } else {
+                    data[key] = value;
+                }
+            }
+            
+            // Add timestamp
+            data.submittedAt = new Date().toISOString();
+            data.callId = '@ViewBag.VideoCallId';
+            
+            try {
+                // Submit evaluation (you can implement an API endpoint for this)
+                console.log('Evaluation Data:', data);
+                
+                // For now, simulate successful submission
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Show thank you modal
+                const modal = new bootstrap.Modal(document.getElementById('thankYouModal'));
+                modal.show();
+                
+                // Optional: Save to localStorage as backup
+                localStorage.setItem('lastEvaluation', JSON.stringify(data));
+                
+            } catch (error) {
+                console.error('Evaluation submission error:', error);
+                alert('Değerlendirme gönderilirken hata oluştu. Lütfen tekrar deneyin.');
+            }
+        });
+
+        // Auto-close after evaluation
+        setTimeout(() => {
+            if (document.getElementById('overallRating').value) {
+                // If user has already rated, show a gentle reminder
+                console.log('User has started evaluation');
+            }
+        }, 60000); // 1 minute
+    </script>
+</body>
+</html>
