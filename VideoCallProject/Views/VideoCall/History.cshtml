@@ -1,0 +1,284 @@
+@model List<VideoCallProject.Models.VideoCall>
+@{
+    ViewBag.Title = "Geçmiş Görüşmeler";
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .page-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem 0; margin-bottom: 2rem; }
+        .history-table { background: white; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 15px; font-size: 0.875rem; }
+        .filter-section { background: white; border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="fas fa-history"></i> Geçmiş Görüşmeler</h1>
+                    <p class="mb-0">Tamamlanmış görüşmelerin detaylı raporları</p>
+                </div>
+                <a href="@Url.Action("Index")" class="btn btn-light">
+                    <i class="fas fa-arrow-left"></i> Dashboard'a Dön
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        @if (!string.IsNullOrEmpty(ViewBag.Error))
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> @ViewBag.Error
+            </div>
+        }
+
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <h5><i class="fas fa-filter"></i> Filtreler</h5>
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Başlangıç Tarihi</label>
+                    <input type="date" class="form-control" name="startDate" value="@Request.QueryString["startDate"]">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Bitiş Tarihi</label>
+                    <input type="date" class="form-control" name="endDate" value="@Request.QueryString["endDate"]">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Durum</label>
+                    <select class="form-select" name="status">
+                        <option value="">Tümü</option>
+                        <option value="ended" @(Request.QueryString["status"] == "ended" ? "selected" : "")>Tamamlandı</option>
+                        <option value="failed" @(Request.QueryString["status"] == "failed" ? "selected" : "")>Başarısız</option>
+                        <option value="cancelled" @(Request.QueryString["status"] == "cancelled" ? "selected" : "")>İptal Edildi</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Filtrele
+                        </button>
+                        <a href="@Url.Action("History")" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Temizle
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-primary">@ViewBag.TotalCount</h3>
+                        <p class="mb-0">Toplam Görüşme</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-success">@Model.Count(x => x.Status == "ended")</h3>
+                        <p class="mb-0">Tamamlanan</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-info">@(Model.Any() ? TimeSpan.FromSeconds(Model.Where(x => x.Duration > 0).Average(x => x.Duration)).ToString(@"mm\:ss") : "00:00")</h3>
+                        <p class="mb-0">Ortalama Süre</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-warning">@Model.Sum(x => x.ChatMessages?.Count(c => !c.IsDeleted) ?? 0)</h3>
+                        <p class="mb-0">Toplam Mesaj</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Table -->
+        <div class="history-table">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3><i class="fas fa-table"></i> Görüşme Geçmişi</h3>
+                <div>
+                    <button class="btn btn-success" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel"></i> Excel'e Aktar
+                    </button>
+                    <button class="btn btn-info" onclick="printReport()">
+                        <i class="fas fa-print"></i> Yazdır
+                    </button>
+                </div>
+            </div>
+
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Tarih & Saat</th>
+                                <th>Oda ID</th>
+                                <th>Konu</th>
+                                <th>Katılımcılar</th>
+                                <th>Süre</th>
+                                <th>Mesaj</th>
+                                <th>Dosya</th>
+                                <th>Kalite</th>
+                                <th>Durum</th>
+                                <th>İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var call in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        <div>@call.StartTime.ToString("dd.MM.yyyy")</div>
+                                        <small class="text-muted">@call.StartTime.ToString("HH:mm")</small>
+                                        @if (call.EndTime.HasValue)
+                                        {
+                                            <small class="text-muted d-block">- @call.EndTime.Value.ToString("HH:mm")</small>
+                                        }
+                                    </td>
+                                    <td><code>@call.RoomId</code></td>
+                                    <td>@(call.Subject ?? "Genel Görüşme")</td>
+                                    <td>
+                                        <div>
+                                            <i class="fas fa-user"></i> @call.CallerName
+                                            @if (call.ParticipantCount > 1)
+                                            {
+                                                <small class="text-muted d-block">+@(call.ParticipantCount - 1) kişi</small>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if (call.Duration > 0)
+                                        {
+                                            <span class="badge bg-info">@TimeSpan.FromSeconds(call.Duration).ToString(@"hh\:mm\:ss")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">@(call.ChatMessages?.Count(c => !c.IsDeleted) ?? 0)</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">@(call.FileShares?.Count(f => !f.IsDeleted) ?? 0)</span>
+                                    </td>
+                                    <td>
+                                        @switch (call.ConnectionQuality)
+                                        {
+                                            case "good":
+                                                <span class="badge bg-success">İyi</span>
+                                                break;
+                                            case "medium":
+                                                <span class="badge bg-warning">Orta</span>
+                                                break;
+                                            case "poor":
+                                                <span class="badge bg-danger">Kötü</span>
+                                                break;
+                                            default:
+                                                <span class="badge bg-secondary">-</span>
+                                                break;
+                                        }
+                                    </td>
+                                    <td>
+                                        @switch (call.Status)
+                                        {
+                                            case "ended":
+                                                <span class="badge bg-success">Tamamlandı</span>
+                                                break;
+                                            case "failed":
+                                                <span class="badge bg-danger">Başarısız</span>
+                                                break;
+                                            case "cancelled":
+                                                <span class="badge bg-warning">İptal</span>
+                                                break;
+                                            default:
+                                                <span class="badge bg-secondary">@call.Status</span>
+                                                break;
+                                        }
+                                    </td>
+                                    <td>
+                                        <a href="@Url.Action("Details", new { id = call.Id })" class="btn btn-sm btn-outline-primary" title="Detayları Görüntüle">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                @if (ViewBag.TotalPages > 1)
+                {
+                    <nav class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            @if (ViewBag.Page > 1)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=@(ViewBag.Page - 1)&pageSize=@ViewBag.PageSize">Önceki</a>
+                                </li>
+                            }
+
+                            @for (int i = Math.Max(1, ViewBag.Page - 2); i <= Math.Min(ViewBag.TotalPages, ViewBag.Page + 2); i++)
+                            {
+                                <li class="page-item @(i == ViewBag.Page ? "active" : "")">
+                                    <a class="page-link" href="?page=@i&pageSize=@ViewBag.PageSize">@i</a>
+                                </li>
+                            }
+
+                            @if (ViewBag.Page < ViewBag.TotalPages)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=@(ViewBag.Page + 1)&pageSize=@ViewBag.PageSize">Sonraki</a>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
+                }
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">Görüşme geçmişi bulunamadı</h4>
+                    <p class="text-muted">Henüz tamamlanmış görüşme bulunmuyor</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function exportToExcel() {
+            // Excel export functionality
+            alert('Excel export özelliği yakında eklenecek');
+        }
+
+        function printReport() {
+            window.print();
+        }
+    </script>
+</body>
+</html>
