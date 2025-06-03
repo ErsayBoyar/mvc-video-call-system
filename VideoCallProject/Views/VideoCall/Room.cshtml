@@ -1,0 +1,339 @@
+@{
+    ViewBag.Title = "Görüntülü Görüşme";
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title</title>
+    <link rel="stylesheet" href="~/Content/videocall.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <!-- Video Section -->
+        <div class="video-section">
+            <!-- Local Video -->
+            <div class="local-video-container">
+                <video id="localVideo" autoplay muted playsinline></video>
+                <div class="video-label">Sen</div>
+            </div>
+            
+            <!-- Remote Video -->
+            <div class="remote-video-container">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <div id="remotePlaceholder" class="remote-placeholder">
+                    <i class="fas fa-user-circle"></i>
+                    <p>Karşı taraf bekleniyor...</p>
+                </div>
+                <div class="video-label" id="baglanan">Bağlanıyor...</div>
+            </div>
+        </div>
+        
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="control-buttons">
+                <button id="micBtn" class="control-btn active" title="Mikrofon">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="cameraBtn" class="control-btn active" title="Kamera">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button id="screenShareBtn" class="control-btn neutral" title="Ekran Paylaşımı">
+                    <i class="fas fa-desktop"></i>
+                </button>
+                <button id="endCallBtn" class="control-btn end-call" title="Çağrıyı Sonlandır">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+            
+            <!-- Status Info -->
+            <div class="status-info">
+                <div id="connectionStatus" class="status-text">Başlatılıyor...</div>
+                <div id="participantCount" class="participant-count">
+                    <i class="fas fa-users"></i> 1 kişi
+                </div>
+                <div id="connectionQuality" class="connection-quality quality-good">
+                    <i class="fas fa-signal"></i> İyi
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Chat Panel -->
+    <div class="chat-panel">
+        <div class="chat-header">
+            <h3><i class="fas fa-comments"></i> Chat</h3>
+            <div id="callStats" class="call-stats"></div>
+        </div>
+        
+        <div id="chatMessages" class="chat-messages"></div>
+        
+        <div class="chat-input-section">
+            <div class="file-upload">
+                <input type="file" id="fileInput" multiple style="display:none;">
+                <button onclick="document.getElementById('fileInput').click()" class="file-btn">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+            </div>
+            
+            <input type="text" id="chatInput" class="chat-input" placeholder="Mesajınızı yazın..." maxlength="500">
+            <button id="sendChatBtn" class="send-btn">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Progress Container -->
+    <div id="fileProgress" class="file-progress-container" style="display:none;"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+    <script src="~/Scripts/jquery.signalR-2.4.3.min.js"></script>
+    <script src="~/signalr/hubs"></script>
+    
+    <!-- Video Call JavaScript -->
+    <script>
+        // Global değişkenler
+        const roomId = "@ViewBag.RoomId";
+        const talepId = "@ViewBag.talepId"
+        const operatorId = "@ViewBag.OperatorId"
+        const tip = "@ViewBag.tip"
+        const adSoyad = "@ViewBag.adSoyad";
+        const konu = "@ViewBag.konu"
+        const videoCallId = "@ViewBag.VideoCallId";
+        
+        let localStream = null;
+        let remoteStream = null;
+        let peerConnection = null;
+        let isInitiator = false;
+        let isChannelReady = false;
+        let isStarted = false;
+        let participantCount = 1;
+        let callStartTime = new Date();
+
+        // DOM elementleri
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const remotePlaceholder = document.getElementById('remotePlaceholder');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const baglanan = document.getElementById('baglanan');
+        const participantCountElement = document.getElementById('participantCount');
+        const connectionQuality = document.getElementById('connectionQuality');
+
+        // SignalR bağlantısı
+        const connection = $.hubConnection("/signalr", {
+            qs: { 
+                talepId: talepId,
+                roomId: roomId,
+                participantName: adSoyad,
+                participantType: operatorId > 0 ? 'operator' : 'customer',
+                participantId: operatorId || null,
+                konu: konu
+            },
+            logging: true,
+            useDefaultPath: false
+        });
+
+        connection.disconnectTimeout = 60000;
+        connection.keepAliveInterval = 15000;
+        connection.transportConnectTimeout = 30000;
+
+        const hub = connection.createHubProxy('videoCallHub');
+
+        // WebRTC konfigürasyonu
+        const pcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]
+        };
+
+        // Sayfa yüklendiğinde başlat
+        window.addEventListener('load', initialize);
+
+        async function initialize() {
+            try {
+                updateStatus('Kamera açılıyor...');
+                await startLocalVideo();
+                await connectToSignalR();
+                await loadChatHistory();
+                await loadFileShareHistory();
+                await loadCallStats();
+            } catch (error) {
+                console.error('Başlatma hatası:', error);
+                updateStatus('Hata: ' + error.message);
+            }
+        }
+
+        // Yerel video başlat
+        async function startLocalVideo() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720 },
+                    audio: { echoCancellation: true, noiseSuppression: true }
+                });
+
+                localVideo.srcObject = localStream;
+                updateStatus('Kamera açıldı');
+            } catch (error) {
+                console.error('Kamera erişim hatası:', error);
+                await logEvent('camera_error', `Kamera erişim hatası: ${error.message}`);
+                throw new Error('Kamera erişimi reddedildi');
+            }
+        }
+
+        // SignalR bağlantısı
+        async function connectToSignalR() {
+            try {
+                updateStatus('Sunucuya bağlanıyor...');
+
+                // Mesaj alıcıları
+                hub.on('receiveMessage', handleMessage);
+                hub.on('userJoined', handleUserJoined);
+                hub.on('userLeft', handleUserLeft);
+                hub.on('receiveChat', function (sender, message) {
+                    displayChatMessage(sender, message, false);
+                });
+                hub.on('receiveFile', function (sender, fileName, fileBytes) {
+                    displayReceivedFile(sender, fileName, fileBytes);
+                });
+
+                // Bağlantıyı başlat
+                await connection.start({
+                    transport: ['webSockets', 'serverSentEvents', 'longPolling'],
+                    waitForPageLoad: true
+                });
+                
+                updateStatus('Sunucuya bağlandı');
+                await logEvent('connected', 'SignalR bağlantısı kuruldu');
+
+                // Odaya katıl
+                await hub.invoke('joinRoom', roomId);
+                updateStatus('Odaya katıldı - Karşı taraf bekleniyor...');
+            } catch (error) {
+                console.error('SignalR bağlantı hatası:', error);
+                throw new Error('Sunucu bağlantısı kurulamadı');
+            }
+        }
+
+        // Event loglama
+        async function logEvent(eventType, description, participantName = null) {
+            try {
+                await fetch('/VideoCall/LogEvent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        roomId: roomId,
+                        eventType: eventType,
+                        description: description,
+                        participantName: participantName || adSoyad
+                    })
+                });
+            } catch (error) {
+                console.error('Event log hatası:', error);
+            }
+        }
+
+        // Chat mesajını göster
+        function displayChatMessage(sender, message, isSent = false) {
+            const chatBox = document.getElementById("chatMessages");
+            const safeMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const isOperator = parseInt(operatorId || 0) > 0;
+            
+            let alignmentClass, displayName;
+            if (isSent) {
+                alignmentClass = 'chat-right';
+                displayName = 'Sen';
+            } else {
+                alignmentClass = 'chat-left';
+                displayName = sender;
+            }
+
+            const msgDiv = document.createElement("div");
+            msgDiv.className = `chat-message ${alignmentClass}`;
+            msgDiv.innerHTML = `
+                <div class="message-content">
+                    <strong>${displayName}:</strong> ${safeMessage}
+                    <small class="message-time">${new Date().toLocaleTimeString()}</small>
+                </div>
+            `;
+            
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Chat mesajı gönder
+        async function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (message !== "") {
+                try {
+                    await hub.invoke("sendChat", roomId, adSoyad, message);
+                    displayChatMessage(adSoyad, message, true);
+                    input.value = '';
+                } catch (error) {
+                    console.error('Chat mesajı gönderme hatası:', error);
+                    showNotification('Mesaj gönderilemedi', 'error');
+                }
+            }
+        }
+
+        // Utility functions
+        function updateStatus(status) {
+            connectionStatus.textContent = status;
+            console.log('Status:', status);
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            const colors = {
+                success: '#28a745',
+                error: '#dc3545',
+                info: '#007bff',
+                warning: '#ffc107'
+            };
+
+            notification.style.cssText = `
+                position: fixed; top: 20px; right: 20px; padding: 15px 20px;
+                background: ${colors[type] || colors.info}; color: white; border-radius: 4px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 9999; max-width: 300px;
+                word-wrap: break-word; font-size: 14px;
+            `;
+
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 4000);
+        }
+
+        // Event listeners
+        document.getElementById('sendChatBtn').addEventListener('click', sendChatMessage);
+        document.getElementById('chatInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        });
+
+        // Placeholder functions (WebRTC implementation buraya eklenecek)
+        function handleMessage(message) { console.log('Message received:', message); }
+        function handleUserJoined(name, topic) { console.log('User joined:', name, topic); }
+        function handleUserLeft() { console.log('User left'); }
+        function displayReceivedFile(sender, fileName, fileBytes) { console.log('File received:', fileName); }
+        async function loadChatHistory() { console.log('Loading chat history...'); }
+        async function loadFileShareHistory() { console.log('Loading file history...'); }
+        async function loadCallStats() { console.log('Loading call stats...'); }
+    </script>
+</body>
+</html>
